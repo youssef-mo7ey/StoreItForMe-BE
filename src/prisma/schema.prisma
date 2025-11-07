@@ -1,0 +1,179 @@
+// This file defines the structure of your application's database.
+// It is designed to support the AuthService and the StoreIt4Me application logic.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- ENUMS ---
+
+// Defines the roles for users: Student, Parent, or Admin for management.
+enum Role {
+  STUDENT
+  PARENT
+  ADMIN
+}
+
+// Defines the method the user used to authenticate
+enum AuthMethod {
+  LOCAL
+  GOOGLE
+  // Add other methods like FACEBOOK, APPLE here later
+}
+
+// Defines the main services offered by the application
+enum ServiceType {
+  SHIP_TO_SCHOOL
+  MOVING_AND_STORAGE
+}
+
+// Defines the duration of the storage term
+enum StorageTerm {
+  SUMMER
+  SHORT_TERM
+  SPRING_AND_SUMMER
+  SUMMER_AND_FALL
+}
+
+// Defines the level of value protection chosen for the order
+enum ProtectionPlan {
+  WAIVED
+  BASIC
+  PREMIUM
+}
+
+// Defines the type of payment plan chosen
+enum PaymentPlanType {
+  PRE_PAY_AND_SAVE
+  PAY_AS_YOU_GO
+  PAY_PER_ITEM
+}
+
+// --- CORE MODELS ---
+
+// The main user account model.
+// Includes fields required by AuthService (email, password, name) plus new app-specific data.
+model User {
+  id               String      @id @default(cuid())
+  email            String      @unique
+  password         String?     // Nullable for social logins (e.g., Google)
+  
+  // Fields for social login integration
+  authMethod       AuthMethod  @default(LOCAL)
+  providerId       String?     // Unique ID from the social provider (e.g., Google user ID)
+  
+  // Additional User details
+  name             String?
+  lastName         String?
+  phone            String?
+  role             Role        @default(STUDENT) // New users will default to STUDENT.
+  
+  // Consent fields from Step 1 of the sign-up process
+  agreedTerms      Boolean     @default(false)
+  marketingConsent Boolean     @default(false)
+  
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  
+  // Relationships
+  sessions         Session[]
+  orders           Order[]
+  collaborators    Collaborator[]
+  
+  // Ensure a user can only have one unique social account per provider (for future expansion)
+  @@unique([providerId, authMethod])
+}
+
+// Stores refresh tokens to manage authentication sessions, as required by AuthService
+model Session {
+  id           String    @id @default(cuid())
+  userId       String
+  token        String    // The access token associated with this session (used in AuthService.logout)
+  refreshToken String    @unique
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+// Represents the secondary user added to an order (e.g., Parent adding a Student, or vice-versa)
+model Collaborator {
+  id        String    @id @default(cuid())
+  userId    String    // The ID of the User who added this collaborator
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  
+  user      User      @relation(fields: [userId], references: [id])
+  orders    Order[]   // Collaborator can be linked to multiple orders
+}
+
+// Represents an address, reusable for both pickup and delivery
+model Address {
+  id        String @id @default(cuid())
+  street1   String
+  street2   String?
+  city      String
+  state     String
+  zip       String
+  country   String @default("US")
+  
+  // Relationships to Orders (an address can be a pickup or delivery location for many orders)
+  pickupOrders   Order[] @relation("PickupAddress")
+  deliveryOrders Order[] @relation("DeliveryAddress")
+  shippingOrders Order[] @relation("KitShippingAddress")
+}
+
+// Represents a customer's storage and moving request (Order #98068 in the PDF)
+model Order {
+  id                     String            @id @default(cuid())
+  orderNumber            Int               @unique @default(autoincrement()) // For user-facing display like #98068
+  userId                 String
+  collaboratorId         String?           // Optional link to the Collaborator if added
+  
+  serviceType            ServiceType
+  storageTerm            StorageTerm
+  protectionPlan         ProtectionPlan
+  paymentPlanType        PaymentPlanType
+  
+  // Packing Kit Details (from Step 3 / Overview)
+  packingKitQuantity     Int               @default(0)
+  kitShippingDate        DateTime?
+  kitShippingAddressId   String?
+  
+  // Address relationships
+  pickupAddressId        String?
+  deliveryAddressId      String?
+  
+  status                 String            @default("Created") // e.g., "Created", "Scheduled", "In Storage", "Delivered"
+  createdAt              DateTime          @default(now())
+  
+  // Relationships
+  user                   User              @relation(fields: [userId], references: [id])
+  collaborator           Collaborator?     @relation(fields: [collaboratorId], references: [id])
+  pickupAddress          Address?          @relation("PickupAddress", fields: [pickupAddressId], references: [id])
+  deliveryAddress        Address?          @relation("DeliveryAddress", fields: [deliveryAddressId], references: [id])
+  kitShippingAddress     Address?          @relation("KitShippingAddress", fields: [kitShippingAddressId], references: [id])
+  
+  storedItems            StoredItem[]
+}
+
+// Represents individual items stored in the order (e.g., "Box 1 of 5", "Bicycle, "Suitcase")
+model StoredItem {
+  id             String    @id @default(cuid())
+  orderId        String
+  description    String
+  estimatedValue Float     // The estimated value of the item in USD
+  isBox          Boolean   @default(false) // Helps distinguish boxes from unboxed items
+  
+  // Note: Photo URL storage would happen here in a real app, 
+  // but as we're not dealing with a file storage solution, we omit the field.
+  
+  order          Order     @relation(fields: [orderId], references: [id])
+}
