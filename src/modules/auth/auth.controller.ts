@@ -83,7 +83,9 @@ export class AuthController {
   }
   
   async me(req: AuthRequest, res: Response): Promise<void> {
-    res.json({ user: req.user });
+    authService.me(req.user!.id).then(userProfile => {
+      res.json({ user: userProfile });
+    });
   }
   
   // OAuth Callback Handler

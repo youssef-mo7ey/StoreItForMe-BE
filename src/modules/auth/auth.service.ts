@@ -290,6 +290,10 @@ export class AuthService {
     }
   }
 
+  async me(userId: string): Promise<UserProfile> {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    return this.mapUserToProfile(user);
+  }
   // Helper method for token generation
   generateTokens(user: JwtUserPayload) {
     const accessToken = generateAccessToken(user);
