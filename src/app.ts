@@ -8,6 +8,8 @@ import { swaggerSpec } from "./config/swagger";
 import { env } from "./config/env";
 import authRoutes from "./modules/auth/auth.router";
 import collaboratorsRoutes from "./modules/collaborators/collaborators.router";
+import stripeRoutes from "./modules/stripe/stripe.router";
+import addressRoutes from "./modules/address/address.router";
 const app = express();
 
 // Middleware
@@ -21,13 +23,17 @@ app.use(
     exposedHeaders: ["Authorization"],
   })
 );
-app.use(express.json());
+
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(env.COOKIE_SECRET));
 app.use(passport.initialize());
+app.use("/api/stripe", stripeRoutes);
+
+app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/address", addressRoutes);
 app.use("/api/collaborators", collaboratorsRoutes);
 
 // Swagger UI

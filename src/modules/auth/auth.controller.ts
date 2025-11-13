@@ -4,13 +4,13 @@ import { AuthService } from './auth.service';
 import { setAuthCookies, clearAuthCookies } from '../../utils/cookie.util';
 import { env } from '../../config/env';
 
-const authService = new AuthService();
 
 export class AuthController {
+  constructor(private authService: AuthService) {}
   async register(req: AuthRequest, res: Response): Promise<void> {
     try {
       const data = req.body;
-      const result = await authService.register(data);
+      const result = await this.authService.register(data);
       
       // Set cookies
       setAuthCookies(res, result.accessToken, result.refreshToken);
@@ -28,7 +28,7 @@ export class AuthController {
   async login(req: AuthRequest, res: Response): Promise<void> {
     try {
       const data = req.body;
-      const result = await authService.login(data);
+      const result = await this.authService.login(data);
       
       // Set cookies
       setAuthCookies(res, result.accessToken, result.refreshToken);
@@ -48,7 +48,7 @@ export class AuthController {
       const token = req.cookies?.accessToken;
       
       if (token) {
-        await authService.logout(token);
+        await this.authService.logout(token);
       }
       
       clearAuthCookies(res);
@@ -68,7 +68,7 @@ export class AuthController {
         return;
       }
       
-      const result = await authService.refreshToken(refreshToken);
+      const result = await this.authService.refreshToken(refreshToken);
       
       // Set new cookies
       setAuthCookies(res, result.accessToken, result.refreshToken);
@@ -83,7 +83,7 @@ export class AuthController {
   }
   
   async me(req: AuthRequest, res: Response): Promise<void> {
-    authService.me(req.user!.id).then(userProfile => {
+    this.authService.me(req.user!.id).then(userProfile => {
       res.json({ user: userProfile });
     });
   }
@@ -92,7 +92,7 @@ export class AuthController {
   oauthCallback(req: AuthRequest, res: Response): void {
     try {
       const user = req.user as any;
-      const result = authService.generateTokens(user);
+      const result = this.authService.generateTokens(user);
       
       // Set cookies
       setAuthCookies(res, result.accessToken, result.refreshToken);
@@ -100,6 +100,7 @@ export class AuthController {
       // Redirect to frontend with success
       res.redirect(`${env.FRONTEND_URL}/auth/success`);
     } catch (error: any) {
+      console.error('OAuth Callback Error:', error);
       res.redirect(`${env.FRONTEND_URL}/auth/error`);
     }
   }

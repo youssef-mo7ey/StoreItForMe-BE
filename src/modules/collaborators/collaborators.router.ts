@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { CollaboratorsController } from "./collaborators.controller";
 import { authenticate, AuthRequest } from "../../middlewares/auth.middleware";
+import { CollaboratorsService } from "./collaborators.service";
 
 const router = Router();
-const controller = new CollaboratorsController();
+const controller = new CollaboratorsController(new CollaboratorsService());
 
 // #swagger.tags = ['Collaborators']
 // #swagger.summary = 'Add a new collaborator for the authenticated user'

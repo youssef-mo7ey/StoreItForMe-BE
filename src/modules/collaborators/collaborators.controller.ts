@@ -1,10 +1,9 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { CollaboratorsService } from "./collaborators.service";
 import { AuthRequest } from "../../middlewares/auth.middleware";
 
-const collaboratorsService = new CollaboratorsService();
-
 export class CollaboratorsController {
+  constructor(private collaboratorsService: CollaboratorsService) {}
   async addCollaborator(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
@@ -12,7 +11,7 @@ export class CollaboratorsController {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const collaborator = await collaboratorsService.addCollaborator(
+      const collaborator = await this.collaboratorsService.addCollaborator(
         userId,
         req.body
       );
@@ -31,7 +30,7 @@ export class CollaboratorsController {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const collaborators = await collaboratorsService.getCollaborators(userId);
+      const collaborators = await this.collaboratorsService.getCollaborators(userId);
       res.status(200).json(collaborators);
     } catch (err: any) {
       console.error(err);

@@ -72,8 +72,7 @@ export class AuthService {
       phone,
       agreedTerms,
       marketingConsent,
-      role,
-      collaborators
+      collaborators,
     } = data;
 
     // 1. Validate Terms
@@ -87,19 +86,22 @@ export class AuthService {
     }
 
     // 3. Check all emails for duplicates
-    const allEmails = [email, ...collaborators.map(c => c.email)];
+    const allEmails = [email, ...collaborators.map((c) => c.email)];
     const existingUsers = await prisma.user.findMany({
       where: { email: { in: allEmails } },
     });
 
     if (existingUsers.length > 0) {
       // Check if main user email exists
-      if (existingUsers.some(u => u.email === email)) {
+      if (existingUsers.some((u) => u.email === email)) {
         throw new AppError("A user with this email already exists.", 400);
       }
       // Check which collaborator email exists
       const existingCollaboratorEmail = existingUsers[0].email;
-      throw new AppError(`A user with the collaborator email ${existingCollaboratorEmail} already exists.`, 400);
+      throw new AppError(
+        `A user with the collaborator email ${existingCollaboratorEmail} already exists.`,
+        400
+      );
     }
 
     // 4. Hash Password
@@ -117,7 +119,7 @@ export class AuthService {
           phone,
           agreedTerms,
           marketingConsent: marketingConsent || false,
-          role: role || Role.STUDENT,
+          role: Role.USER,
           authMethod: AuthMethod.LOCAL,
         },
       });
@@ -130,8 +132,8 @@ export class AuthService {
             firstName: collaborator.firstName,
             lastName: collaborator.lastName,
             email: collaborator.email,
-            phone: collaborator.phone || '',
-          }
+            phone: collaborator.phone || "",
+          },
         });
       }
 
@@ -216,7 +218,7 @@ export class AuthService {
           name,
           lastName: lastName || null,
           phone: phone || null,
-          role: Role.STUDENT, // Default role for new sign-ups
+          role: Role.USER, // Default role for new sign-ups
           authMethod: AuthMethod.GOOGLE,
           providerId,
           agreedTerms: false, // User must complete the onboarding flow later
@@ -299,5 +301,53 @@ export class AuthService {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
     return { accessToken, refreshToken };
+  }
+
+  async adminRegister(userId: string, data: LocalRegisterInput): Promise<void> {
+    const {
+      email,
+      password,
+      name,
+      lastName,
+      phone,
+      agreedTerms,
+      marketingConsent,
+      role,
+    } = data;
+    try {
+      const admin = await prisma.user.findUnique({ where: { id: userId } });
+      const user = await prisma.user.findUnique({ where: { email } });
+      // Check if user with email already exists
+      if (user) {
+        throw new Error("A user with this email already exists.");
+      }
+      // Only admins can register new admin users or users with elevated roles
+      if (!admin || admin.role !== Role.ADMIN) {
+        throw new Error("Only admins can register new admin users");
+      }
+      // Hash Password
+      const hashedPassword = await hashPassword(password);
+      // Create User and Collaborators in a transaction
+      const newUser = await prisma.$transaction(async (tx) => {
+        // Create main user
+        await tx.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name,
+            lastName: lastName || null,
+            phone: phone || null,
+            role: role,
+            authMethod: AuthMethod.LOCAL,
+            agreedTerms: agreedTerms || false,
+            marketingConsent: marketingConsent || false,
+          },
+        });
+      });
+      return newUser;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Service: Admin registration failed");
+    }
   }
 }

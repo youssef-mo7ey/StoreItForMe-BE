@@ -2,9 +2,10 @@ import { Router } from "express";
 import passport from "../../config/passport";
 import { AuthController } from "./auth.controller";
 import { authenticate, AuthRequest } from "../../middlewares/auth.middleware";
+import { AuthService } from "./auth.service";
 
 const router = Router();
-const authController = new AuthController();
+const authController = new AuthController(new AuthService());
 
 // Traditional Auth
 router.post("/register", (req, res) => {
